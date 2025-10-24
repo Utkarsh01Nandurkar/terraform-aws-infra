@@ -1,0 +1,66 @@
+## How to run (local)
+
+1. Clone this repo and `cd terraform-aws-infra`:
+```bash
+git clone https://github.com/Utkarsh01Nandurkar/terraform-aws-infra.git
+cd terraform-aws-infra
+
+cp terraform.tfvars.example terraform.tfvars
+# edit terraform.tfvars to set region, project, etc.
+
+
+terraform init
+
+terraform validate
+terraform plan -out plan.tfplan
+
+terraform apply "plan.tfplan"
+
+# Use aws cli to update kubeconfig
+aws eks update-kubeconfig --region ${AWS_REGION:-us-east-1} --name $(terraform output -raw eks_cluster_id)
+# OR use the outputs: terraform output eks_cluster_endpoint etc.
+kubectl get nodes
+
+# Authenticate with ECR (example)
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $(terraform output -raw ecr_repository_url | sed 's/\/.*//')
+
+# Build
+docker build -t myapp:latest .
+
+# Tag
+docker tag myapp:latest $(terraform output -raw ecr_repository_url):v1
+
+# Push
+docker push $(terraform output -raw ecr_repository_url):v1
+
+
+##Clean up##
+
+
+
+---
+
+### Optional helper script: `bootstrap-kubectl.sh`
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+REGION=${1:-us-east-1}
+CLUSTER_NAME=$(terraform output -raw eks_cluster_id)
+
+echo "Updating kubeconfig for cluster: $CLUSTER_NAME in $REGION"
+aws eks update-kubeconfig --region "$REGION" --name "$CLUSTER_NAME"
+
+echo "Kubectl nodes:"
+kubectl get nodes -o wide
+
+
+terraform destroy -auto-approve
+
+
+Contact / Author
+
+Utkarsh Nandurkar
+LinkedIn: https://linkedin.com/in/utkarsh-nandurkar-1533821b0
+
+Portfolio: https://utkarsh01nandurkar.github.io
